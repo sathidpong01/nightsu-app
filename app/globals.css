@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* กำหนดค่าพาเลตหลักไว้ที่ :root ให้ทุกหน้าดึงใช้ได้แน่นอน */
+:root {
+  --brand-bg: #1f2433;
+  --brand-surface: #2a3145;
+  --brand-muted: #3a435a;
+  --brand-border: #3a435a;
+  --brand-text: #e6eaf2;
+  --brand-subtext: #aab2c5;
+  --brand-primary: #1ec8ff;
+  --brand-secondary: #37d67a;
+}
+
+/* สีพื้นฐาน/ลิงก์ให้เข้ากับธีม */
+@layer base {
+  html, body {
+    background: var(--brand-bg);
+    color: var(--brand-text);
+  }
+  a { color: var(--brand-text); }
+
+  /* ยูทิลิตี้สีตัวอักษร */
+  .text-brand-text { color: var(--brand-text); }
+  .text-brand-subtext { color: var(--brand-subtext); }
+}
+
+/* คอมโพเนนต์สไตล์หลัก (ไม่ใช้ @apply เพื่อหลีกเลี่ยงปัญหา) */
+@layer components {
+  .card {
+    border-radius: 1rem;                 /* rounded-2xl */
+    border: 1px solid var(--brand-border);
+    background: var(--brand-surface);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+  }
+
+  .chip {
+    padding: 0.25rem 0.75rem;            /* py-1 px-3 */
+    border-radius: 9999px;               /* rounded-full */
+    border: 1px solid var(--brand-border);
+    font-size: 0.875rem;                 /* text-sm */
+    line-height: 1.25rem;
+    color: var(--brand-subtext);
+    background: transparent;
+    transition: color .15s ease;
+  }
+
+  .chip:hover {
+    color: var(--brand-primary);
+  }
+
+  .chip-active {
+    background: var(--brand-primary);
+    color: var(--brand-bg);
+    border-color: transparent;
+  }
+
+  .input {
+    border: 1px solid var(--brand-border);
+    border-radius: 0.75rem;              /* rounded-xl */
+    padding: 0.5rem 0.75rem;             /* py-2 px-3 */
+    background-color: rgba(58, 67, 90, 0.30); /* เดิม bg-[var(--brand-muted)]/30 */
+    color: var(--brand-text);
+  }
+  .input::placeholder {
+    color: var(--brand-subtext);
+  }
+
+  .button-primary {
+    padding: 0.5rem 1rem;                /* py-2 px-4 */
+    border-radius: 0.75rem;              /* rounded-xl */
+    background: var(--brand-primary);
+    color: var(--brand-bg);
+    font-weight: 500;
+  }
+}
+
+@layer components {
+    /* ปุ่มสีสำหรับแดชบอร์ด */
+    .button-info {
+      @apply inline-flex items-center justify-center rounded-xl px-3 py-1.5 text-sm font-medium
+             bg-sky-500 text-white hover:opacity-90 transition;
+    }
+    .button-success {
+      @apply inline-flex items-center justify-center rounded-xl px-3 py-1.5 text-sm font-medium
+             bg-emerald-500 text-white hover:opacity-90 transition;
+    }
+    .button-warn {
+      @apply inline-flex items-center justify-center rounded-xl px-3 py-1.5 text-sm font-medium
+             bg-amber-500 text-white hover:opacity-90 transition;
+    }
+    .button-danger {
+      @apply inline-flex items-center justify-center rounded-xl px-3 py-1.5 text-sm font-medium
+             bg-rose-600 text-white hover:opacity-90 transition;
+    }
+  }
+  
+  /* ปรับสี select และ dropdown ให้เข้ากับธีม */
+select.input {
+    background-color: var(--brand-surface);
+    color: var(--brand-text);
+    border: 1px solid var(--brand-border);
+    border-radius: 0.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  /* ปรับสี option ใน dropdown */
+  select.input option {
+    background-color: var(--brand-surface);
+    color: var(--brand-text);
+  }
+  
+  /* เมื่อ hover หรือเลือก option */
+  select.input option:hover,
+  select.input option:checked {
+    background-color: var(--brand-primary);
+    color: var(--brand-bg);
+  }
+  
+  @layer utilities {
+    .underline-fx {
+      position: relative;
+      text-decoration: none;
+      outline: none;
+      display: inline-block; /* ให้กว้างเท่าข้อความ */
+    }
+    .underline-fx::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: -2px;
+      width: 100%;
+      height: 2px;
+      background: currentColor;
+      transform: scaleX(0);
+      transform-origin: center;
+      transition: transform .28s ease, opacity .28s ease;
+      opacity: .85;
+      border-radius: 9999px;
+    }
+    .underline-fx:hover::after,
+    .underline-fx:focus-visible::after { transform: scaleX(1); }
+  }
