@@ -1,125 +1,164 @@
-import OneshotCard from "@/components/OneshotCard";
-import SearchBar from "@/components/SearchBar";
-import GenreFilter from "@/components/GenreFilter";
-import { listAllGenres, searchOneshots, type CardItem, type SearchInput } from "@/lib/oneshots";
-import BackButton from "@/components/BackButton";
+"use client";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 20;
+type Row = {
+  id: string;
+  title: string;
+  coverUrl: string;
+  pageCount: number;
+  isPublished: boolean;
+  updatedAt: string;
+  genres: string[]; // อาจมีตัวพิมพ์ผสม เช่น ["Sheep","Wolf"]
+};
 
-const PAGE_SIZE = 24;
+export default function AdminDashboard() {
+  const [list, setList] = useState<Row[]>([]);
+  const [q, setQ] = useState("");
+  const [genre, setGenre] = useState("");    // เก็บค่าเป็น lower-case
+  const [genres, setGenres] = useState<string[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Record<string, string | string[] | undefined>;
-}) {
-  const q = (searchParams.q as string) || "";
-  const genre = (searchParams.genre as string) || undefined;
-  const author = (searchParams.author as string) || undefined;
-  const page = Math.max(1, Number(searchParams.page ?? 1));
+  // โหลดรายการ + แท็ก (API ปัจจุบันของคุณมี /api/admin/list และ /api/admin/genres)
+  useEffect(() => {
+    (async () => {
+      const [listRes, genresRes] = await Promise.all([
+        fetch("/api/admin/list", { cache: "no-store" }),
+        fetch("/api/admin/genres", { cache: "no-store" }),
+      ]);
+      const rows = (await listRes.json()) as Row[];
+      const rawGenres = (await genresRes.json()) as string[];
 
-  // สร้าง args สำหรับ searchOneshots
-  const args: SearchInput = { q, genre, take: PAGE_SIZE, skip: (page - 1) * PAGE_SIZE };
-  if (author) args.author = author;
+      // ทำให้เป็นชุด unique และ “ค่าจริงเป็น lower-case”
+      const set = new Map<string, string>(); // lower -> display
+      rawGenres.forEach((g) => {
+        const val = (g || "").toString().trim().toLowerCase();
+        if (!val) return;
+        if (!set.has(val)) {
+          const label = g.slice(0, 1).toUpperCase() + g.slice(1).toLowerCase();
+          set.set(val, label);
+        }
+      });
 
-  const [genres, rawData]: [string[], CardItem[]] = await Promise.all([listAllGenres(), searchOneshots(args)]);
+      setList(rows);
+      setGenres(Array.from(set.values())); // เก็บ label ไว้โชว์สวย ๆ
+    })();
+  }, []);
 
-  // searchOneshots returns CardItem[] array
-  const items = rawData;
-  const total = items.length;
+  // ฟิลเตอร์แบบไม่แยกตัวพิมพ์
+  const filtered = useMemo(() => {
+    const ql = q.trim().toLowerCase();
+    return list.filter((r) => {
+      const okQ = ql
+        ? (r.title || "").toLowerCase().includes(ql) || r.id.toLowerCase().includes(ql)
+        : true;
+
+      const okG = genre
+        ? (r.genres ?? []).some(
+            (g) => (g || "").toString().trim().toLowerCase() === genre
+          )
+        : true;
+
+      return okQ && okG;
+    });
+  }, [list, q, genre]);
+
+  async function togglePublish(row: Row) {
+    await fetch(`/api/admin/entry?id=${row.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ isPublished: !row.isPublished }),
+    });
+    // รีโหลดรายการหลังอัปเดต
+    const res = await fetch("/api/admin/list", { cache: "no-store" });
+    setList(await res.json());
+  }
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-6">
-      <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight text-white">
-          NIGHTSU <span className="text-zinc-400">SPACE</span>
-        </h1>
-        <SearchBar />
-      </header>
+    <main className="mx-auto max-w-6xl px-4 py-6">
+      <h1 className="mb-4 text-2xl font-semibold">Admin Dashboard</h1>
 
-      <div className="mb-5">
-        <GenreFilter genres={genres} />
-      </div>
+      {/* แถบค้นหา & เลือกแท็ก */}
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <input
+          ref={inputRef}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="ค้นหา title หรือ slug"
+          className="h-11 w-72 rounded-xl bg-zinc-900/70 px-4 text-sm text-zinc-200 outline-none ring-1 ring-white/10 placeholder:text-zinc-500 focus:ring-2 focus:ring-sky-400"
+        />
 
-      {items.length > 0 ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          {items.map((it: CardItem) => (
-            <OneshotCard key={it.id} item={it} />
-          ))}
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          {/* Search icon */}
-          <div className="mb-6 text-zinc-400">
-            <svg 
-              width="64" 
-              height="64" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="1.5" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.35-4.35" />
-            </svg>
-          </div>
-
-          {/* No results message */}
-          <h3 className="mb-2 text-xl font-semibold text-zinc-200">
-            ไม่พบผลลัพธ์
-          </h3>
-          
-          <p className="mb-6 max-w-md text-zinc-400">
-            {q && genre && author ? (
-              `ไม่พบผลงานที่ตรงกับ "${q}" ในหมวดหมู่ "${genre}" ของ "${author}"`
-            ) : q && genre ? (
-              `ไม่พบผลงานที่ตรงกับ "${q}" ในหมวดหมู่ "${genre}"`
-            ) : q && author ? (
-              `ไม่พบผลงานที่ตรงกับ "${q}" ของ "${author}"`
-            ) : q ? (
-              `ไม่พบผลงานที่ตรงกับ "${q}"`
-            ) : genre && author ? (
-              `ไม่พบผลงานในหมวดหมู่ "${genre}" ของ "${author}"`
-            ) : genre ? (
-              `ไม่พบผลงานในหมวดหมู่ "${genre}"`
-            ) : author ? (
-              `ไม่พบผลงานของ "${author}"`
-            ) : (
-              "ไม่พบผลงานใดๆ"
-            )}
-          </p>
-        </div>
-      )}
-
-      {total > PAGE_SIZE && (
-        <nav className="mt-8 flex items-center justify-center gap-2">
-          {Array.from({ length: Math.ceil(total / PAGE_SIZE) }).map((_, i) => {
-            const p = i + 1;
-            const sp = new URLSearchParams(
-              Object.entries(searchParams).flatMap(([k, v]) => (v ? [[k, String(v)]] : []))
-            );
-            sp.set("page", String(p));
-            const href = `/?${sp.toString()}`;
+        <select
+          className="h-11 rounded-xl bg-zinc-900/70 px-3 text-sm text-zinc-200 ring-1 ring-white/10 focus:ring-2 focus:ring-sky-400"
+          value={genre}
+          onChange={(e) => setGenre(e.target.value.toLowerCase())} // ✅ เก็บเป็น lower-case เสมอ
+        >
+          <option value="">— เลือกแท็ก —</option>
+          {genres.map((label) => {
+            const value = label.toLowerCase(); // ค่าเทียบจริง
             return (
-              <a
-                key={p}
-                href={href}
-                className={`rounded-lg px-3 py-1 text-sm ring-1 ring-white/10 ${
-                  p === page
-                    ? "bg-white/90 text-black"
-                    : "bg-zinc-900/60 text-zinc-300 hover:bg-zinc-800"
-                }`}
-              >
-                {p}
-              </a>
+              <option key={value} value={value}>
+                {label}
+              </option>
             );
           })}
-        </nav>
-      )}
+        </select>
+
+        <div className="ml-auto text-sm text-zinc-400">
+          ทั้งหมด: {filtered.length} เรื่อง
+        </div>
+      </div>
+
+      {/* รายการการ์ดแบบง่าย */}
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+        {filtered.map((r) => (
+          <div
+            key={r.id}
+            className="flex items-center gap-3 rounded-xl bg-zinc-900/60 p-3 ring-1 ring-white/10"
+          >
+            <img
+              src={r.coverUrl}
+              alt={r.title}
+              className="h-20 w-16 flex-none rounded-lg object-cover"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="line-clamp-1 font-medium">{r.title}</div>
+              <div className="text-xs text-zinc-400">
+                {r.pageCount} pages • {new Date(r.updatedAt).toLocaleString()}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {(r.genres ?? []).map((g) => (
+                  <span
+                    key={g}
+                    className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] text-zinc-300"
+                  >
+                    #{g}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col items-end gap-2">
+              <button
+                onClick={() => togglePublish(r)}
+                className={`rounded-lg px-2 py-1 text-xs ring-1 ring-white/10 ${
+                  r.isPublished ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-200"
+                }`}
+              >
+                {r.isPublished ? "Unpublish" : "Publish"}
+              </button>
+              <Link
+                href={`/admin/editor?id=${r.id}`}
+                className="rounded-lg bg-sky-600 px-2 py-1 text-xs text-white"
+              >
+                Edit
+              </Link>
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <div className="text-zinc-400">ไม่พบรายการ</div>
+        )}
+      </section>
     </main>
   );
 }
